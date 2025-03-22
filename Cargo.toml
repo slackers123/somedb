@@ -1,0 +1,9 @@
+[package]
+name = "somedb"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+somedb-macros = { path = "somedb-macros/" }
+sha2-const = {git = "https://github.com/slackers123/sha2-const.git"}
+hex = "0.4.3"
