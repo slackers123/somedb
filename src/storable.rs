@@ -1,6 +1,6 @@
 use crate::{byte_reader::ByteReader, type_hash::TypeHash};
 
-pub trait Storable: Sized + Clone {
+pub unsafe trait Storable: Sized + Clone {
     fn type_hash() -> TypeHash;
     fn encoded(&self) -> Vec<u8> {
         let mut enc = self.inner_encoded();
@@ -22,7 +22,7 @@ macro_rules! impl_all_storable_number {
 
 macro_rules! impl_storable_number {
     ($ty:ident) => {
-        impl Storable for $ty {
+        unsafe impl Storable for $ty {
             fn type_hash() -> TypeHash {
                 unsafe { TypeHash::from_str(stringify!($ty)) }
             }
@@ -42,7 +42,7 @@ impl_all_storable_number!(
     u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, usize, isize
 );
 
-impl Storable for String {
+unsafe impl Storable for String {
     fn type_hash() -> TypeHash {
         unsafe { TypeHash::from_str("String") }
     }
@@ -54,7 +54,7 @@ impl Storable for String {
     }
 }
 
-impl<T: Storable> Storable for Vec<T> {
+unsafe impl<T: Storable> Storable for Vec<T> {
     fn type_hash() -> TypeHash {
         unsafe { TypeHash::new("Vec", &["inner"], &[T::type_hash()]) }
     }

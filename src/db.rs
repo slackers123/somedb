@@ -3,11 +3,17 @@ use std::{
     error::Error,
     fs::{self},
     path::PathBuf,
+    sync::Mutex,
 };
 
-use crate::{byte_reader::ByteReader, entity::Entity, storable::Storable, type_hash::TypeHash};
+use crate::{
+    byte_reader::ByteReader, entity::Entity, entity_meta::EntityMeta, id::IdType,
+    storable::Storable, type_hash::TypeHash,
+};
 
-/// A (for now) in memory db
+static DATABASE_CREATED: Mutex<bool> = Mutex::new(false);
+
+/// A SomeDb instance
 #[derive(Debug)]
 pub struct Database {
     db_dir: PathBuf,
@@ -15,11 +21,22 @@ pub struct Database {
 }
 
 impl Database {
-    pub fn default() -> std::io::Result<Self> {
-        Self::new(PathBuf::from("sdb/"))
+    pub fn default(clear: bool) -> DbResult<Self> {
+        Self::new(PathBuf::from("sdb/"), clear)
     }
 
-    pub fn new(db_dir: PathBuf) -> std::io::Result<Self> {
+    pub fn new(db_dir: PathBuf, clear: bool) -> DbResult<Self> {
+        // a little bit hackey but the best we'll do for now
+        let mut db_created = DATABASE_CREATED.lock().unwrap();
+        if *db_created {
+            return Err(DbError::DbInstanceExists);
+        }
+        *db_created = true;
+
+        if clear {
+            let _ = fs::remove_dir_all(&db_dir);
+        }
+
         let _ = fs::create_dir_all(&db_dir);
 
         let stored_types: HashMap<_, _> = fs::read_dir(&db_dir)?
@@ -53,46 +70,52 @@ impl Database {
         })
     }
 
-    pub fn store<T: Entity>(&mut self, data: T) -> DbResult<T> {
+    pub fn store<T: Entity>(&mut self, mut data: T) -> DbResult<T> {
         let type_hash = T::type_hash();
 
         if !self.stored_types.contains_key(&type_hash) {
-            self.add_new_type(type_hash)?;
+            self.add_new_type::<T>()?;
         }
 
-        let mut existing = self.read_all::<T>()?;
+        let mut existing = self.raw_read_all::<T>()?;
 
-        if existing
-            .iter()
-            .find(|e| e.get_id() == data.get_id())
-            .is_some()
+        if !T::GENERATE_ID
+            && existing
+                .entities
+                .iter()
+                .find(|e| e.get_id() == data.get_id())
+                .is_some()
         {
             return Err(DbError::IdExists);
         }
 
-        existing.push(data.clone());
+        if T::GENERATE_ID {
+            data.set_id(<T::Id as IdType>::generate(existing.last_id))
+        }
+
+        existing.entities.push(data.clone());
 
         self.raw_write_all(existing)?;
 
         Ok(data)
     }
 
-    pub fn write_all<T: Entity>(&mut self, all_entities: Vec<T>) -> DbResult<()> {
+    pub fn write_all<T: Entity>(&mut self, entities: Vec<T>, last_id: T::Id) -> DbResult<()> {
         let type_hash = T::type_hash();
 
         if !self.stored_types.contains_key(&type_hash) {
-            self.add_new_type(type_hash)?;
+            self.add_new_type::<T>()?;
         }
 
-        self.raw_write_all(all_entities)?;
+        self.raw_write_all(EntityMeta { last_id, entities })?;
 
         Ok(())
     }
 
-    pub fn raw_write_all<T: Entity>(&mut self, all_entities: Vec<T>) -> DbResult<()> {
+    pub fn raw_write_all<T: Entity>(&mut self, raw: EntityMeta<T>) -> DbResult<()> {
         let type_hash = T::type_hash();
 
-        let new_data = all_entities.encoded();
+        let new_data = raw.encoded();
 
         fs::write(self.type_hash_file_path(&type_hash), new_data)?;
 
@@ -100,6 +123,10 @@ impl Database {
     }
 
     pub fn read_all<T: Entity>(&self) -> DbResult<Vec<T>> {
+        Ok(self.raw_read_all()?.entities)
+    }
+
+    pub fn raw_read_all<T: Entity>(&self) -> DbResult<EntityMeta<T>> {
         let type_hash = T::type_hash();
 
         self.stored_types
@@ -110,7 +137,7 @@ impl Database {
 
         let mut reader = ByteReader::new(&vec);
 
-        Ok(Vec::decoded(reader.reader_for_block()))
+        Ok(EntityMeta::decoded(reader.reader_for_block()))
     }
 
     pub fn read_all_ids<T: Entity>(&self) -> DbResult<Vec<T::Id>> {
@@ -122,15 +149,16 @@ impl Database {
     }
 
     pub fn update_entity<T: Entity>(&mut self, entity: T) -> DbResult<()> {
-        let mut arr = self.read_all::<T>()?;
-        let res = arr
+        let mut raw = self.raw_read_all::<T>()?;
+        let res = raw
+            .entities
             .iter_mut()
             .find(|e| e.get_id() == entity.get_id())
             .ok_or(DbError::IdNotFound)?;
 
         *res = entity;
 
-        self.write_all(arr)?;
+        self.raw_write_all(raw)?;
 
         Ok(())
     }
@@ -144,7 +172,8 @@ impl Database {
         Ok(())
     }
 
-    fn add_new_type(&mut self, type_hash: TypeHash) -> Result<(), std::io::Error> {
+    fn add_new_type<T: Entity>(&mut self) -> DbResult<()> {
+        let type_hash = T::type_hash();
         let mut new_file = self.db_dir.clone();
         new_file.push(PathBuf::from(format!(
             "{}.sdb",
@@ -156,6 +185,11 @@ impl Database {
         opts.write(true);
         opts.create(true);
         opts.open(new_file)?;
+
+        self.raw_write_all::<T>(EntityMeta {
+            last_id: <T::Id as IdType>::initial(),
+            entities: vec![],
+        })?;
 
         self.stored_types.insert(type_hash, ());
         Ok(())
@@ -179,7 +213,8 @@ pub enum DbError {
     TypeNotFound,
     IdNotFound,
     IoError(std::io::Error),
-    LoadError(),
+    LoadError,
+    DbInstanceExists,
 }
 
 impl From<std::io::Error> for DbError {
