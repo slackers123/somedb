@@ -14,6 +14,7 @@
 //!
 //! fn main() {
 //!     let mut db = somedb::db::Database::default(true).unwrap();
+//!
 //!     let entity = MyStruct {
 //!         id: 0, // this will be ignored because auto_generate is active
 //!         foo: "bar".to_string(),

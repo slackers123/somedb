@@ -47,13 +47,7 @@ impl Database {
                     return None;
                 }
 
-                let hash_raw = hex::decode(parts[0]).ok()?;
-
-                if hash_raw.len() != 32 {
-                    return None;
-                }
-
-                let type_hash = unsafe { TypeHash::from_raw(hash_raw[0..32].try_into().unwrap()) };
+                let type_hash = TypeHash::decode(parts[0]);
 
                 let mut opts = fs::OpenOptions::new();
                 opts.read(true);
@@ -174,17 +168,12 @@ impl Database {
 
     fn add_new_type<T: Entity>(&mut self) -> DbResult<()> {
         let type_hash = T::type_hash();
-        let mut new_file = self.db_dir.clone();
-        new_file.push(PathBuf::from(format!(
-            "{}.sdb",
-            hex::encode(type_hash.as_bytes())
-        )));
 
         let mut opts = fs::OpenOptions::new();
         opts.read(true);
         opts.write(true);
         opts.create(true);
-        opts.open(new_file)?;
+        opts.open(self.type_hash_file_path(&type_hash))?;
 
         self.raw_write_all::<T>(EntityMeta {
             last_id: <T::Id as IdType>::initial(),
@@ -197,10 +186,7 @@ impl Database {
 
     fn type_hash_file_path(&self, type_hash: &TypeHash) -> PathBuf {
         let mut path = self.db_dir.clone();
-        path.push(PathBuf::from(format!(
-            "{}.sdb",
-            hex::encode(type_hash.as_bytes())
-        )));
+        path.push(PathBuf::from(format!("{}.sdb", type_hash.encode())));
         path
     }
 }
