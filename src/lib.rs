@@ -33,6 +33,7 @@ pub mod db;
 pub mod entity;
 pub mod entity_meta;
 pub mod id;
+mod sha;
 pub mod storable;
 #[doc(hidden)]
 pub mod type_hash;

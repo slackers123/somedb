@@ -21,15 +21,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "sha2-const"
-version = "0.1.2"
-source = "git+https://github.com/slackers123/sha2-const.git#c0f507f575e34632602c59eb423b16e39e5a1882"
-
-[[package]]
 name = "somedb"
 version = "0.1.0"
 dependencies = [
- "sha2-const",
  "somedb-macros",
 ]
 

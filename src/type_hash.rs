@@ -1,4 +1,4 @@
-use sha2_const::Sha256;
+use crate::sha::Sha1;
 
 #[rustfmt::skip]
 const ENCODING_TABLE: [char; 64] = [
@@ -26,7 +26,7 @@ const fn get_dec(e: u8) -> u8 {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct TypeHash {
-    hash: [u8; 32],
+    hash: [u8; 20],
 }
 
 impl TypeHash {
@@ -37,7 +37,7 @@ impl TypeHash {
         field_names: &[&'static str],
         field_types: &[TypeHash],
     ) -> Self {
-        let mut sha = Sha256::new().update(type_name.as_bytes());
+        let mut sha = Sha1::new().update(type_name.as_bytes());
         let mut i = 0;
         while i < field_names.len() {
             sha = sha.update(field_names[i].as_bytes());
@@ -52,11 +52,11 @@ impl TypeHash {
     /// ## Safety:
     /// Since types must be completely unique it is unsafe to manually create them.
     pub const unsafe fn from_str(src: &'static str) -> Self {
-        let hash = Sha256::new().update(src.as_bytes()).finalize();
+        let hash = Sha1::new().update(src.as_bytes()).finalize();
         Self { hash }
     }
 
-    pub const unsafe fn from_raw(hash: [u8; 32]) -> Self {
+    pub const unsafe fn from_raw(hash: [u8; 20]) -> Self {
         Self { hash }
     }
 
