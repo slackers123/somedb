@@ -1,2 +1,15 @@
 [workspace]
 members = ["somedb", "somedb-macros"]
+version = "0.1.0"
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+description = "A simple database for storing data."
+edition = "2024"
+license-file = "LICENSE"
+readme = "README.md"
+repository = "https://github.com/slackers123/somedb"
+
+[workspace.dependencies]
+somedb-macros = { path = "somedb-macros", version = "0.1.0" }
