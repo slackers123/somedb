@@ -1,7 +1,2 @@
-[package]
-name = "somedb"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-somedb-macros = { path = "somedb-macros/" }
+[workspace]
+members = ["somedb", "somedb-macros"]
