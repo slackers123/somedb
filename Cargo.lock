@@ -22,14 +22,14 @@ dependencies = [
 
 [[package]]
 name = "somedb"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "somedb-macros",
 ]
 
 [[package]]
 name = "somedb-macros"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "proc-macro2",
  "quote",
