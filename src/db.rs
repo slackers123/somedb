@@ -118,15 +118,17 @@ impl Database {
     }
 
     pub fn read_all<T: Entity>(&self) -> DbResult<Vec<T>> {
-        Ok(self.raw_read_all()?.entities)
-    }
-
-    pub fn raw_read_all<T: Entity>(&self) -> DbResult<EntityMeta<T>> {
         let type_hash = T::type_hash();
 
         self.stored_types
             .get(&type_hash)
             .ok_or(DbError::TypeNotFound)?;
+
+        Ok(self.raw_read_all()?.entities)
+    }
+
+    pub fn raw_read_all<T: Entity>(&self) -> DbResult<EntityMeta<T>> {
+        let type_hash = T::type_hash();
 
         let vec = fs::read(self.type_hash_file_path(&type_hash))?;
 
@@ -144,6 +146,12 @@ impl Database {
     }
 
     pub fn update_entity<T: Entity>(&mut self, entity: T) -> DbResult<()> {
+        let type_hash = T::type_hash();
+
+        self.stored_types
+            .get(&type_hash)
+            .ok_or(DbError::TypeNotFound)?;
+
         let mut raw = self.raw_read_all::<T>()?;
         let res = raw
             .entities
@@ -155,6 +163,24 @@ impl Database {
 
         self.raw_write_all(raw)?;
 
+        Ok(())
+    }
+
+    pub fn delte_entity_by_id<T: Entity>(&mut self, id: T::Id) -> DbResult<()> {
+        let type_hash = T::type_hash();
+
+        self.stored_types
+            .get(&type_hash)
+            .ok_or(DbError::TypeNotFound)?;
+
+        let mut raw = self.raw_read_all::<T>()?;
+        raw.entities = raw
+            .entities
+            .into_iter()
+            .filter(|e| e.get_id() != id)
+            .collect();
+
+        self.raw_write_all(raw)?;
         Ok(())
     }
 
@@ -192,6 +218,12 @@ impl Database {
     }
 }
 
+impl Drop for Database {
+    fn drop(&mut self) {
+        *DATABASE_CREATED.lock().unwrap() = false;
+    }
+}
+
 type DbResult<T> = Result<T, DbError>;
 
 #[derive(Debug)]
@@ -202,6 +234,34 @@ pub enum DbError {
     IoError(std::io::Error),
     LoadError,
     DbInstanceExists,
+}
+
+impl PartialEq for DbError {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            Self::IdExists => match other {
+                Self::IdExists => true,
+                _ => false,
+            },
+            Self::TypeNotFound => match other {
+                Self::TypeNotFound => true,
+                _ => false,
+            },
+            Self::IdNotFound => match other {
+                Self::IdNotFound => true,
+                _ => false,
+            },
+            Self::IoError(_) => false,
+            Self::LoadError => match other {
+                Self::LoadError => true,
+                _ => false,
+            },
+            Self::DbInstanceExists => match other {
+                Self::DbInstanceExists => true,
+                _ => false,
+            },
+        }
+    }
 }
 
 impl From<std::io::Error> for DbError {
