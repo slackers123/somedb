@@ -30,3 +30,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Features
+- [x] Store entities
+- [x] Load all entities
+- [x] Load entities by id
+- [ ] Delete entities by id
+- [ ] general query iterator
+
+## Future Improvements
+- [ ] improved storage model to avoid loading entire database into memory
