@@ -142,6 +142,8 @@ pub fn entity(
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     let input: proc_macro2::TokenStream = input.into();
+    // FIXME: Clone should only be derived if it isn't already since
+    //        this is really annoying right now.
     let output = quote! {
         #[derive(Clone, somedb::Storable, somedb::Entity)]
         #input

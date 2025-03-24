@@ -88,6 +88,7 @@ impl Database {
         }
 
         existing.entities.push(data.clone());
+        existing.last_id = data.get_id();
 
         self.raw_write_all(existing)?;
 
