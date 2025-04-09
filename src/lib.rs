@@ -36,6 +36,7 @@ pub mod db;
 pub mod entity;
 pub mod entity_meta;
 pub mod id;
+pub mod query;
 mod sha;
 pub mod storable;
 #[doc(hidden)]

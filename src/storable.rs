@@ -1,4 +1,4 @@
-use crate::{byte_reader::ByteReader, type_hash::TypeHash};
+use crate::{byte_reader::ByteReader, db::DbResult, type_hash::TypeHash};
 
 pub unsafe trait Storable: Sized + Clone {
     fn type_hash() -> TypeHash;
@@ -9,7 +9,7 @@ pub unsafe trait Storable: Sized + Clone {
         vec
     }
     fn inner_encoded(&self) -> Vec<u8>;
-    fn decoded(reader: ByteReader) -> Self;
+    fn decoded(reader: ByteReader) -> DbResult<Self>;
 
     // fn inner_decoded(data: &[u8]) -> Self;
 }
@@ -31,8 +31,10 @@ macro_rules! impl_storable_number {
                 Vec::from(self.to_be_bytes())
             }
 
-            fn decoded(reader: ByteReader) -> Self {
-                Self::from_be_bytes(reader.read_byte_slice().try_into().unwrap())
+            fn decoded(reader: ByteReader) -> DbResult<Self> {
+                Ok(Self::from_be_bytes(
+                    reader.read_byte_slice().try_into().unwrap(),
+                ))
             }
         }
     };
@@ -49,8 +51,8 @@ unsafe impl Storable for String {
     fn inner_encoded(&self) -> Vec<u8> {
         Vec::from(self.as_bytes())
     }
-    fn decoded(reader: ByteReader) -> Self {
-        String::from_utf8(reader.read_byte_slice().to_vec()).unwrap()
+    fn decoded(reader: ByteReader) -> DbResult<Self> {
+        Ok(String::from_utf8(reader.read_byte_slice().to_vec()).unwrap())
     }
 }
 
@@ -63,11 +65,11 @@ unsafe impl<T: Storable> Storable for Vec<T> {
         self.iter().flat_map(|e| e.encoded()).collect()
     }
 
-    fn decoded(mut reader: ByteReader) -> Self {
+    fn decoded(mut reader: ByteReader) -> DbResult<Self> {
         let mut res = Vec::new();
         while !reader.is_at_end() {
-            res.push(T::decoded(reader.reader_for_block()));
+            res.push(T::decoded(reader.reader_for_block())?);
         }
-        res
+        Ok(res)
     }
 }

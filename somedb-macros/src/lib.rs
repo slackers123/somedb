@@ -45,11 +45,11 @@ pub fn derive_storable(item: TokenStream) -> TokenStream {
                             bytes
                         }
 
-                        fn decoded(mut reader: somedb::byte_reader::ByteReader) -> Self {
-                            #(let #names = #types::decoded(reader.reader_for_block());)*
-                            #ident {
+                        fn decoded(mut reader: somedb::byte_reader::ByteReader) -> somedb::db::DbResult<Self> {
+                            #(let #names = #types::decoded(reader.reader_for_block())?;)*
+                            Ok(#ident {
                                 #(#names),*
-                            }
+                            })
                         }
                     }
                 }

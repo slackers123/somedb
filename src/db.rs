@@ -7,8 +7,13 @@ use std::{
 };
 
 use crate::{
-    byte_reader::ByteReader, entity::Entity, entity_meta::EntityMeta, id::IdType,
-    storable::Storable, type_hash::TypeHash,
+    byte_reader::ByteReader,
+    entity::Entity,
+    entity_meta::EntityMeta,
+    id::IdType,
+    query::{DbQuery, DbQueryMut},
+    storable::Storable,
+    type_hash::TypeHash,
 };
 
 static DATABASE_CREATED: Mutex<bool> = Mutex::new(false);
@@ -95,12 +100,17 @@ impl Database {
         Ok(data)
     }
 
-    pub fn write_all<T: Entity>(&mut self, entities: Vec<T>, last_id: T::Id) -> DbResult<()> {
+    pub fn write_all<T: Entity>(&mut self, entities: Vec<T>) -> DbResult<()> {
         let type_hash = T::type_hash();
 
         if !self.stored_types.contains_key(&type_hash) {
             self.add_new_type::<T>()?;
         }
+
+        let last_id = entities
+            .last()
+            .map(|e| e.get_id())
+            .unwrap_or_else(|| <T::Id as IdType>::initial());
 
         self.raw_write_all(EntityMeta { last_id, entities })?;
 
@@ -134,7 +144,7 @@ impl Database {
 
         let mut reader = ByteReader::new(&vec);
 
-        Ok(EntityMeta::decoded(reader.reader_for_block()))
+        EntityMeta::decoded(reader.reader_for_block())
     }
 
     pub fn read_all_ids<T: Entity>(&self) -> DbResult<Vec<T::Id>> {
@@ -216,6 +226,20 @@ impl Database {
         path.push(PathBuf::from(format!("{}.sdb", type_hash.encode())));
         path
     }
+
+    /// Creates a [DbQuery](crate::query::DbQuery) which can
+    /// be used to query the database like any other iterator.
+    pub fn query<T: Entity>(&self) -> DbResult<DbQuery<T>> {
+        DbQuery::new(self)
+    }
+
+    /// Creates a [DbQueryMut](crate::query::DbQueryMut) which
+    /// can be used to query the database and make changes to it
+    /// which can then be applied to the database via the
+    /// [save_to_db](crate::query::DbIterator::save_to_db) function.
+    pub fn query_mut<T: 'static + Entity>(&mut self) -> DbResult<DbQueryMut<T>> {
+        DbQueryMut::new(self)
+    }
 }
 
 impl Drop for Database {
@@ -224,7 +248,7 @@ impl Drop for Database {
     }
 }
 
-type DbResult<T> = Result<T, DbError>;
+pub type DbResult<T> = Result<T, DbError>;
 
 #[derive(Debug)]
 pub enum DbError {
@@ -234,6 +258,7 @@ pub enum DbError {
     IoError(std::io::Error),
     LoadError,
     DbInstanceExists,
+    InvalidFileVersion,
 }
 
 impl PartialEq for DbError {
@@ -258,6 +283,10 @@ impl PartialEq for DbError {
             },
             Self::DbInstanceExists => match other {
                 Self::DbInstanceExists => true,
+                _ => false,
+            },
+            Self::InvalidFileVersion => match other {
+                Self::InvalidFileVersion => true,
                 _ => false,
             },
         }

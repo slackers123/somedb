@@ -36,3 +36,15 @@ test = true
 [[example]]
 name = "auto_generate_ids"
 test = true
+
+[[example]]
+name = "save_query"
+test = true
+
+[[example]]
+name = "simple_query"
+test = true
+
+[[example]]
+name = "delete_by_id"
+test = true

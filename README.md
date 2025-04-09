@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 - [x] Store entities
 - [x] Load all entities
 - [x] Load entities by id
-- [ ] Delete entities by id
+- [x] Delete entities by id
 - [ ] general query iterator
 
 ## Future Improvements
