@@ -1,5 +1,5 @@
 [workspace]
-members = ["somedb-macros"]
+members = ["somedb-macros", "test_proj"]
 resolver = "3"
 
 [workspace.package]

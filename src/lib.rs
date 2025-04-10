@@ -35,6 +35,7 @@ pub mod byte_reader;
 pub mod db;
 pub mod entity;
 pub mod entity_meta;
+pub mod gen_query;
 pub mod id;
 pub mod query;
 mod sha;

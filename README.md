@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 - [x] Load all entities
 - [x] Load entities by id
 - [x] Delete entities by id
-- [ ] general query iterator
+- [x] general query iterator
 
 ## Future Improvements
 - [ ] improved storage model to avoid loading entire database into memory
