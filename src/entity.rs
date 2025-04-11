@@ -1,7 +1,9 @@
-use crate::{id::IdType, storable::Storable};
+use crate::{gen_query::ExprEntity, id::IdType, storable::Storable};
 
 pub trait Entity: Storable {
     type Id: IdType;
+    type ExprBase: ExprEntity<Self>;
+
     const GENERATE_ID: bool;
 
     fn get_id(&self) -> Self::Id;

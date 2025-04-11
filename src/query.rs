@@ -1,7 +1,10 @@
+use std::marker::PhantomData;
+
 use crate::{
     db::{Database, DbResult},
     entity::Entity,
     entity_meta::EntityMeta,
+    gen_query::{ExprEntity, GenExpr},
 };
 
 pub struct DbQuery<T: Entity> {
@@ -55,7 +58,11 @@ impl<'a, T: 'a + Entity> DbIterator for DbQueryMut<'a, T> {
         Some(self.data.entities[self.index - 1].clone())
     }
 
-    fn get_db(&mut self) -> &mut Database {
+    fn get_db_mut(&mut self) -> &mut Database {
+        self.db
+    }
+
+    fn get_db(&self) -> &Database {
         self.db
     }
 
@@ -69,12 +76,20 @@ pub trait DbIterator: Sized {
     fn next(&mut self) -> Option<Self::Item>;
 
     fn get_last_id(&self) -> <Self::Item as Entity>::Id;
-    fn get_db(&mut self) -> &mut Database;
+    fn get_db_mut(&mut self) -> &mut Database;
+    fn get_db(&self) -> &Database;
 
-    fn filter<P: FnMut(&Self::Item) -> bool>(self, predicate: P) -> DbFilter<Self, P> {
+    fn filter<Q, P>(self, predicate: P) -> DbFilter<Q, P, Self>
+    where
+        Q: GenExpr<Self::Item, Output = bool>,
+        P: Fn(&<Self::Item as Entity>::ExprBase) -> Q,
+    {
         DbFilter {
             inner: self,
-            predicate,
+            query: predicate(&<<Self::Item as Entity>::ExprBase as ExprEntity<
+                Self::Item,
+            >>::new()),
+            _int: PhantomData,
         }
     }
 
@@ -99,38 +114,46 @@ pub trait DbIterator: Sized {
             entities.push(e);
         }
         let last_id = self.get_last_id();
-        let db = self.get_db();
+        let db = self.get_db_mut();
         db.raw_write_all::<Self::Item>(EntityMeta { last_id, entities })?;
 
         Ok(())
     }
 }
 
-pub struct DbFilter<I, P>
+pub struct DbFilter<Q, P, I>
 where
+    Q: GenExpr<I::Item, Output = bool>,
+    P: Fn(&<I::Item as Entity>::ExprBase) -> Q,
     I: DbIterator,
-    P: FnMut(&I::Item) -> bool,
 {
     inner: I,
-    predicate: P,
+    query: Q,
+    _int: PhantomData<P>,
 }
 
-impl<I, P> DbIterator for DbFilter<I, P>
+impl<Q, P, I> DbIterator for DbFilter<Q, P, I>
 where
+    Q: GenExpr<I::Item, Output = bool>,
+    P: Fn(&<I::Item as Entity>::ExprBase) -> Q,
     I: DbIterator,
-    P: FnMut(&I::Item) -> bool,
 {
     type Item = I::Item;
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(inner_next) = self.inner.next() {
-            if (self.predicate)(&inner_next) {
+            let db = self.get_db();
+            if self.query.exec(&db) {
                 return Some(inner_next);
             }
         }
         return None;
     }
 
-    fn get_db(&mut self) -> &mut Database {
+    fn get_db_mut(&mut self) -> &mut Database {
+        self.inner.get_db_mut()
+    }
+
+    fn get_db(&self) -> &Database {
         self.inner.get_db()
     }
 
@@ -158,7 +181,11 @@ where
         Some((self.predicate)(self.inner.next()?))
     }
 
-    fn get_db(&mut self) -> &mut Database {
+    fn get_db_mut(&mut self) -> &mut Database {
+        self.inner.get_db_mut()
+    }
+
+    fn get_db(&self) -> &Database {
         self.inner.get_db()
     }
 
