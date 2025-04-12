@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 ### Queries
-There are two types of queries. Simple quereis are simply iterators over a list of entities.
+There are two types of queries. Simple queries are simply iterators over a list of entities.
 ```rust
 let alans = db.query::<Person>()?
     .filter(|p| p.first_name == "Alan")
