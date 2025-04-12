@@ -26,7 +26,7 @@ macro_rules! int_func_impl {
 pub trait GenExpr<E: Entity>: Sized {
     type Output;
 
-    fn exec(&self, db: &Database) -> Self::Output;
+    fn exec(&self, db: &Database, row_id: E::Id) -> Self::Output;
 
     fn eq<B: GenExpr<E>>(self, rhs: B) -> BinExpr<E, EqOp<E, Self, B>, Self, B>
     where
@@ -125,7 +125,7 @@ pub trait BinOp<E: Entity> {
     type Output;
     type Lhs: GenExpr<E>;
     type Rhs: GenExpr<E>;
-    fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database) -> Self::Output;
+    fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database, row_id: E::Id) -> Self::Output;
 }
 
 pub struct BinExpr<E: Entity, O, A, B>
@@ -144,8 +144,8 @@ impl<E: Entity, O: BinOp<E, Lhs = A, Rhs = B>, A: GenExpr<E>, B: GenExpr<E>> Gen
 {
     type Output = O::Output;
 
-    fn exec(&self, db: &Database) -> Self::Output {
-        O::exec(&self.a, &self.b, db)
+    fn exec(&self, db: &Database, row_id: E::Id) -> Self::Output {
+        O::exec(&self.a, &self.b, db, row_id)
     }
 }
 
@@ -163,8 +163,8 @@ where
     type Lhs = A;
     type Rhs = B;
     type Output = bool;
-    fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database) -> Self::Output {
-        lhs.exec(db) == rhs.exec(db)
+    fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database, row_id: E::Id) -> Self::Output {
+        lhs.exec(db, row_id) == rhs.exec(db, row_id)
     }
 }
 
@@ -182,8 +182,8 @@ where
     type Lhs = A;
     type Rhs = B;
     type Output = bool;
-    fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database) -> Self::Output {
-        lhs.exec(db) != rhs.exec(db)
+    fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database, row_id: E::Id) -> Self::Output {
+        lhs.exec(db, row_id) != rhs.exec(db, row_id)
     }
 }
 
@@ -199,8 +199,8 @@ where
     type Lhs = A;
     type Rhs = B;
     type Output = bool;
-    fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database) -> Self::Output {
-        lhs.exec(db) || rhs.exec(db)
+    fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database, row_id: E::Id) -> Self::Output {
+        lhs.exec(db, row_id) || rhs.exec(db, row_id)
     }
 }
 
@@ -216,8 +216,8 @@ where
     type Lhs = A;
     type Rhs = B;
     type Output = bool;
-    fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database) -> Self::Output {
-        lhs.exec(db) && rhs.exec(db)
+    fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database, row_id: E::Id) -> Self::Output {
+        lhs.exec(db, row_id) && rhs.exec(db, row_id)
     }
 }
 
@@ -236,8 +236,8 @@ where
     type Rhs = B;
     type Output = A::Output;
 
-    fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database) -> Self::Output {
-        lhs.exec(db) | rhs.exec(db)
+    fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database, row_id: E::Id) -> Self::Output {
+        lhs.exec(db, row_id) | rhs.exec(db, row_id)
     }
 }
 
@@ -256,8 +256,8 @@ where
     type Rhs = B;
     type Output = A::Output;
 
-    fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database) -> Self::Output {
-        lhs.exec(db) & rhs.exec(db)
+    fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database, row_id: E::Id) -> Self::Output {
+        lhs.exec(db, row_id) & rhs.exec(db, row_id)
     }
 }
 
@@ -276,8 +276,8 @@ where
     type Rhs = B;
     type Output = A::Output;
 
-    fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database) -> Self::Output {
-        lhs.exec(db) ^ rhs.exec(db)
+    fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database, row_id: E::Id) -> Self::Output {
+        lhs.exec(db, row_id) ^ rhs.exec(db, row_id)
     }
 }
 
@@ -297,8 +297,8 @@ macro_rules! int_op_impl {
             type Lhs = A;
             type Rhs = B;
             type Output = T;
-            fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database) -> Self::Output {
-                lhs.exec(db) $calc rhs.exec(db)
+            fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database, row_id: E::Id) -> Self::Output {
+                lhs.exec(db, row_id) $calc rhs.exec(db, row_id)
             }
         }
     };
@@ -328,8 +328,8 @@ macro_rules! ord_op_impl {
             type Lhs = A;
             type Rhs = B;
             type Output = bool;
-            fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database) -> Self::Output {
-                lhs.exec(db) $calc rhs.exec(db)
+            fn exec(lhs: &Self::Lhs, rhs: &Self::Rhs, db: &Database, row_id: E::Id) -> Self::Output {
+                lhs.exec(db, row_id) $calc rhs.exec(db, row_id)
             }
         }
     };
@@ -359,33 +359,43 @@ where
 {
     type Output = bool;
 
-    fn exec(&self, db: &Database) -> Self::Output {
-        self.a.exec(db) == self.b.exec(db)
+    fn exec(&self, db: &Database, row_id: E::Id) -> Self::Output {
+        self.a.exec(db, row_id) == self.b.exec(db, row_id)
     }
 }
 
 pub trait ResolveAttrExpr<T>: Entity {
-    fn resolve(expr: &AttrExpr<Self, T>, db: &Database) -> T;
+    fn resolve(field_name: &'static str, row_id: Self::Id, db: &Database) -> T;
 }
 
 pub struct AttrExpr<E: Entity, T> {
+    field_name: &'static str,
     _int: PhantomData<(E, T)>,
+}
+
+impl<E: Entity, T> AttrExpr<E, T> {
+    pub fn new(field_name: &'static str) -> Self {
+        Self {
+            field_name,
+            _int: PhantomData,
+        }
+    }
 }
 
 impl<E: ResolveAttrExpr<T>, T> GenExpr<E> for AttrExpr<E, T> {
     type Output = T;
-    fn exec(&self, db: &Database) -> Self::Output {
-        E::resolve(self, db)
+    fn exec(&self, db: &Database, row_id: E::Id) -> Self::Output {
+        E::resolve(self.field_name, row_id, db)
     }
 }
 
 impl<E: Entity, T: Copy> GenExpr<E> for T {
     type Output = T;
-    fn exec(&self, _db: &Database) -> Self::Output {
+    fn exec(&self, _db: &Database, _row_id: E::Id) -> Self::Output {
         *self
     }
 }
 
-pub trait ExprEntity<E> {
+pub trait ExprEntity<E: Entity> {
     fn new() -> Self;
 }

@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use somedb::{db::Database, entity, query::DbIterator};
+use somedb::{db::Database, entity, gen_query::GenExpr, query::DbIterator};
 
 #[entity]
 #[derive(Debug, PartialEq)]
@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     db.store(entity.clone())?;
 
     db.query_mut::<MyStruct>()?
-        .filter(|e| e.id != 1)
+        .filter(|e| e.id().neq(1))
         .map(|mut e| {
             e.data.push('a');
             e

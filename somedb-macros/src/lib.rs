@@ -1,6 +1,9 @@
+use std::any::Any;
+
 use proc_macro::TokenStream;
-use quote::quote;
-use syn::Field;
+use proc_macro2::Span;
+use quote::{ToTokens, quote};
+use syn::{Field, Ident};
 
 #[proc_macro_derive(Storable)]
 pub fn derive_storable(item: TokenStream) -> TokenStream {
@@ -90,6 +93,79 @@ pub fn derive_entity(item: TokenStream) -> TokenStream {
                     })
                     .expect("there must be an Id");
 
+                // this is really scuffed but I couldn't quickly find a group_by method that works
+                // with non-consecutive elements
+
+                let mut names: Vec<_> = n.named.iter().map(|n| n.ident.as_ref().unwrap()).collect();
+                let mut types: Vec<_> = n.named.iter().map(|n| n.ty.clone()).collect();
+
+                let expr_base_name =
+                    Ident::new(&format!("{}ExprBase", ident.to_string()), Span::call_site());
+
+                let expr_base = quote! {
+                    struct #expr_base_name;
+                    impl #expr_base_name {
+                        #(pub fn #names(&self) -> somedb::gen_query::AttrExpr<#ident, #types> {
+                            somedb::gen_query::AttrExpr::new(stringify!(#names))
+                        })*
+                    }
+
+                    impl somedb::gen_query::ExprEntity<#ident> for #expr_base_name {
+                        fn new() -> Self {
+                            Self
+                        }
+                    }
+                };
+
+                let mut names_for_types = vec![];
+                while let Some(ty) = types.get(0) {
+                    let all_ty: Vec<_> = types
+                        .clone()
+                        .into_iter()
+                        .enumerate()
+                        .filter_map(|(i, t)| {
+                            (t.to_token_stream().to_string() == ty.to_token_stream().to_string()) // this is really bad...
+                                .then(|| i)
+                        })
+                        .collect();
+
+                    names_for_types.push((
+                        ty.clone(),
+                        all_ty.iter().map(|t| names[*t]).collect::<Vec<_>>(),
+                    ));
+
+                    types = types
+                        .into_iter()
+                        .enumerate()
+                        .filter_map(|(i, ty)| (!all_ty.contains(&i)).then(|| ty))
+                        .collect();
+
+                    names = names
+                        .into_iter()
+                        .enumerate()
+                        .filter_map(|(i, n)| (!all_ty.contains(&i)).then(|| n))
+                        .collect();
+                }
+
+                let mut resolve_impls = vec![];
+                for names_for_type in names_for_types {
+                    let (ty, names) = names_for_type;
+
+                    let resolve_impl = quote! {
+                        impl somedb::gen_query::ResolveAttrExpr<#ty> for #ident {
+                            fn resolve(field_name: &'static str, row_id: Self::Id, db: &somedb::db::Database) -> #ty {
+                                let entity = db.find_by_id::<Self>(row_id).unwrap().unwrap();
+
+                                match field_name {
+                                    #(stringify!(#names) => entity.#names,)*
+                                    _ => panic!("unknown field name: {field_name}")
+                                }
+                            }
+                        }
+                    };
+                    resolve_impls.push(resolve_impl);
+                }
+
                 let generate_id = if id_field
                     .attrs
                     .iter()
@@ -115,6 +191,7 @@ pub fn derive_entity(item: TokenStream) -> TokenStream {
                     #[automatically_derived]
                     impl somedb::entity::Entity for #ident {
                         type Id = #id_field_type;
+                        type ExprBase = #expr_base_name;
                         #generate_id;
 
                         fn get_id(&self) -> #id_field_type {
@@ -125,6 +202,10 @@ pub fn derive_entity(item: TokenStream) -> TokenStream {
                             self.#id_field_name = id;
                         }
                     }
+
+                    #(#resolve_impls)*
+
+                    #expr_base
                 }
                 .into()
             }

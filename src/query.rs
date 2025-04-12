@@ -142,7 +142,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(inner_next) = self.inner.next() {
             let db = self.get_db();
-            if self.query.exec(&db) {
+            if self.query.exec(&db, inner_next.get_id()) {
                 return Some(inner_next);
             }
         }
