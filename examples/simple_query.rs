@@ -5,7 +5,7 @@ use somedb::{db::Database, entity};
 #[entity]
 #[derive(Debug, PartialEq)]
 struct MyStruct {
-    #[entity_id]
+    #[entity_id(auto_generate)]
     id: u32,
     data: String,
 }
@@ -20,12 +20,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let first = db.store(entity.clone())?;
-    entity.id = 1;
-    db.store(entity.clone())?;
-    entity.id = 2;
+    let second = db.store(entity.clone())?;
     let third = db.store(entity.clone())?;
 
-    let res: Vec<_> = db.query::<MyStruct>()?.filter(|e| e.id != 1).collect();
+    let res: Vec<_> = db
+        .query::<MyStruct>()?
+        // now we filter out the second entry
+        .filter(|e| e.id != second.id)
+        .collect();
 
     assert_eq!(res, vec![first, third]);
 

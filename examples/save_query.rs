@@ -5,7 +5,7 @@ use somedb::{db::Database, entity, gen_query::GenExpr, query::DbIterator};
 #[entity]
 #[derive(Debug, PartialEq)]
 struct MyStruct {
-    #[entity_id]
+    #[entity_id(auto_generate)]
     id: u32,
     data: String,
 }
@@ -14,36 +14,34 @@ struct MyStruct {
 fn main() -> Result<(), Box<dyn Error>> {
     let mut db = Database::default(true)?;
 
-    let mut entity = MyStruct {
+    let entity = MyStruct {
         id: 0,
         data: "Hello, World!".into(),
     };
 
-    db.store(entity.clone())?;
-    entity.id = 1;
-    db.store(entity.clone())?;
-    entity.id = 2;
+    let first_stored = db.store(entity.clone())?;
+    let second_stored = db.store(entity.clone())?;
     db.store(entity.clone())?;
 
     db.query_mut::<MyStruct>()?
-        .filter(|e| e.id().neq(1))
+        .filter(|e| e.id().neq(second_stored.id))
         .map(|mut e| {
             e.data.push('a');
             e
         })
         .save_to_db()?;
 
-    let first = db.find_by_id::<MyStruct>(0)?;
+    let first_found = db.find_by_id::<MyStruct>(first_stored.id)?;
 
     assert_eq!(
-        first,
+        first_found,
         Some(MyStruct {
-            id: 0,
-            data: "Hello, World!a".into()
+            id: first_stored.id,
+            data: "Hello, World!a".to_string()
         })
     );
 
-    let second = db.find_by_id::<MyStruct>(1)?;
+    let second = db.find_by_id::<MyStruct>(second_stored.id)?;
 
     assert_eq!(second, None);
 

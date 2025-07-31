@@ -3,7 +3,6 @@ use std::{
     error::Error,
     fs::{self},
     path::PathBuf,
-    sync::Mutex,
 };
 
 use crate::{
@@ -15,8 +14,6 @@ use crate::{
     storable::Storable,
     type_hash::TypeHash,
 };
-
-static DATABASE_CREATED: Mutex<bool> = Mutex::new(false);
 
 /// A SomeDb instance
 #[derive(Debug)]
@@ -31,13 +28,6 @@ impl Database {
     }
 
     pub fn new(db_dir: PathBuf, clear: bool) -> DbResult<Self> {
-        // a little bit hackey but the best we'll do for now
-        let mut db_created = DATABASE_CREATED.lock().unwrap();
-        if *db_created {
-            return Err(DbError::DbInstanceExists);
-        }
-        *db_created = true;
-
         if clear {
             let _ = fs::remove_dir_all(&db_dir);
         }
@@ -242,12 +232,6 @@ impl Database {
     }
 }
 
-impl Drop for Database {
-    fn drop(&mut self) {
-        *DATABASE_CREATED.lock().unwrap() = false;
-    }
-}
-
 pub type DbResult<T> = Result<T, DbError>;
 
 #[derive(Debug)]
@@ -257,7 +241,6 @@ pub enum DbError {
     IdNotFound,
     IoError(std::io::Error),
     LoadError,
-    DbInstanceExists,
     InvalidFileVersion,
 }
 
@@ -279,10 +262,6 @@ impl PartialEq for DbError {
             Self::IoError(_) => false,
             Self::LoadError => match other {
                 Self::LoadError => true,
-                _ => false,
-            },
-            Self::DbInstanceExists => match other {
-                Self::DbInstanceExists => true,
                 _ => false,
             },
             Self::InvalidFileVersion => match other {

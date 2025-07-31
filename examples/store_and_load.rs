@@ -5,7 +5,7 @@ use somedb::{db::Database, entity};
 #[entity]
 #[derive(Debug, PartialEq)]
 struct MyStruct {
-    #[entity_id]
+    #[entity_id(auto_generate)]
     id: u32,
     data: String,
 }

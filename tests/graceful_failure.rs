@@ -23,17 +23,3 @@ fn load_without_create() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-
-#[test]
-fn multiple_db() -> Result<(), Box<dyn Error>> {
-    let db = Database::default(true)?;
-
-    assert_eq!(
-        Database::default(true).expect_err("creating two databases should not be possible"),
-        DbError::DbInstanceExists
-    );
-
-    drop(db);
-
-    Ok(())
-}
