@@ -29,7 +29,7 @@ impl<'a> ByteReader<'a> {
 
     fn read_len(&mut self) -> u32 {
         self.start += 4;
-        return u32::from_be_bytes(self.src[(self.start - 4)..self.start].try_into().unwrap());
+        u32::from_be_bytes(self.src[(self.start - 4)..self.start].try_into().unwrap())
     }
 
     pub fn read_byte_slice(&'a self) -> &'a [u8] {

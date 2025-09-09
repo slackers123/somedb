@@ -49,7 +49,7 @@ impl Database {
                 opts.write(true);
                 opts.open(f.ok()?.path()).ok()?;
 
-                return Some((type_hash, ()));
+                Some((type_hash, ()))
             })
             .collect();
 
@@ -72,8 +72,7 @@ impl Database {
             && existing
                 .entities
                 .iter()
-                .find(|e| e.get_id() == data.get_id())
-                .is_some()
+                .any(|e| e.get_id() == data.get_id())
         {
             return Err(DbError::IdExists);
         }
@@ -100,7 +99,7 @@ impl Database {
         let last_id = entities
             .last()
             .map(|e| e.get_id())
-            .unwrap_or_else(|| <T::Id as IdType>::initial());
+            .unwrap_or_else(<T::Id as IdType>::initial);
 
         self.raw_write_all(EntityMeta { last_id, entities })?;
 
@@ -174,11 +173,7 @@ impl Database {
             .ok_or(DbError::TypeNotFound)?;
 
         let mut raw = self.raw_read_all::<T>()?;
-        raw.entities = raw
-            .entities
-            .into_iter()
-            .filter(|e| e.get_id() != id)
-            .collect();
+        raw.entities.retain(|e| e.get_id() != id);
 
         self.raw_write_all(raw)?;
         Ok(())
@@ -227,7 +222,7 @@ impl Database {
     /// can be used to query the database and make changes to it
     /// which can then be applied to the database via the
     /// [save_to_db](crate::query::DbIterator::save_to_db) function.
-    pub fn query_mut<T: 'static + Entity>(&mut self) -> DbResult<DbQueryMut<T>> {
+    pub fn query_mut<'a, T: 'static + Entity>(&'a mut self) -> DbResult<DbQueryMut<'a, T>> {
         DbQueryMut::new(self)
     }
 }
@@ -247,27 +242,12 @@ pub enum DbError {
 impl PartialEq for DbError {
     fn eq(&self, other: &Self) -> bool {
         match self {
-            Self::IdExists => match other {
-                Self::IdExists => true,
-                _ => false,
-            },
-            Self::TypeNotFound => match other {
-                Self::TypeNotFound => true,
-                _ => false,
-            },
-            Self::IdNotFound => match other {
-                Self::IdNotFound => true,
-                _ => false,
-            },
+            Self::IdExists => matches!(other, Self::IdExists),
+            Self::TypeNotFound => matches!(other, Self::TypeNotFound),
+            Self::IdNotFound => matches!(other, Self::IdNotFound),
             Self::IoError(_) => false,
-            Self::LoadError => match other {
-                Self::LoadError => true,
-                _ => false,
-            },
-            Self::InvalidFileVersion => match other {
-                Self::InvalidFileVersion => true,
-                _ => false,
-            },
+            Self::LoadError => matches!(other, Self::LoadError),
+            Self::InvalidFileVersion => matches!(other, Self::InvalidFileVersion),
         }
     }
 }

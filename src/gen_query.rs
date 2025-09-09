@@ -88,7 +88,7 @@ pub trait GenExpr<E: Entity>: Sized {
         }
     }
 
-    fn lor<B: GenExpr<E>>(self, rhs: B) -> BinExpr<E, LOrOp<E, Self, B>, Self, B>
+    fn lor<B>(self, rhs: B) -> BinExpr<E, LOrOp<E, Self, B>, Self, B>
     where
         Self: GenExpr<E, Output = bool>,
         B: GenExpr<E, Output = bool>,
@@ -100,7 +100,7 @@ pub trait GenExpr<E: Entity>: Sized {
         }
     }
 
-    fn land<B: GenExpr<E>>(self, rhs: B) -> BinExpr<E, LAndOp<E, Self, B>, Self, B>
+    fn land<B>(self, rhs: B) -> BinExpr<E, LAndOp<E, Self, B>, Self, B>
     where
         Self: GenExpr<E, Output = bool>,
         B: GenExpr<E, Output = bool>,

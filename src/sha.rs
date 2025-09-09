@@ -106,6 +106,7 @@ impl Sha1 {
 
         let mut digest = [0; 20];
         let mut i = 0;
+        #[allow(clippy::identity_op)]
         while i < 5 {
             let bytes = self.state[i].to_be_bytes();
             digest[(i * 4) + 0] = bytes[0];
@@ -117,11 +118,13 @@ impl Sha1 {
         digest
     }
 
+    #[allow(clippy::identity_op)]
     const fn iteration(&mut self) {
         // break chunk into sixteen 32-bit big-endian words w[i], 0 ≤ i ≤ 15
         let mut w = [0; 80];
         cfor!( i in 0..16 {
                 let off = i*4;
+
                 w[i] = u32::from_be_bytes([
                     self.buffer[off + 0],
                     self.buffer[off + 1],

@@ -1,5 +1,9 @@
 use crate::{byte_reader::ByteReader, db::DbResult, type_hash::TypeHash};
 
+/// Represents a storable data type
+///
+/// # Safety
+/// This should only be implemented via the "entity" macro.
 pub unsafe trait Storable: Sized + Clone {
     fn type_hash() -> TypeHash;
     fn encoded(&self) -> Vec<u8> {

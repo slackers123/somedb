@@ -74,11 +74,11 @@ impl TypeHash {
                 if c.len() == 2 {
                     let c3 = get_enc((c[1] << 2) & 0b111111);
 
-                    return [c1, c2, c3, '='];
+                    [c1, c2, c3, '=']
                 } else {
                     let c3 = get_enc((c[1] << 2 | c[2] >> 6) & 0b111111);
                     let c4 = get_enc(c[2] & 0b111111);
-                    return [c1, c2, c3, c4];
+                    [c1, c2, c3, c4]
                 }
             })
             .collect()
@@ -89,12 +89,12 @@ impl TypeHash {
             .as_bytes()
             .chunks(4)
             .flat_map(|c| {
-                let enc: Vec<_> = c.into_iter().map(|i| get_dec(*i)).collect();
+                let enc: Vec<_> = c.iter().map(|i| get_dec(*i)).collect();
                 if (*c.last().unwrap() as char) == '=' {
                     let c1 = (enc[0] << 2) | (enc[1] >> 4);
                     let c2 = (enc[1] << 4) | (enc[2] >> 2);
 
-                    return vec![c1, c2];
+                    vec![c1, c2]
                 } else {
                     let c1 = (enc[0] << 2) | (enc[1] >> 4);
                     let c2 = (enc[1] << 4) | (enc[2] >> 2);
@@ -103,7 +103,7 @@ impl TypeHash {
                 }
             })
             .collect();
-        return unsafe { Self::from_raw(hash.try_into().unwrap()) };
+        unsafe { Self::from_raw(hash.try_into().unwrap()) }
     }
 }
 

@@ -83,12 +83,7 @@ pub fn derive_entity(item: TokenStream) -> TokenStream {
                 let id_field: &Field = n
                     .named
                     .iter()
-                    .find(|f| {
-                        f.attrs
-                            .iter()
-                            .find(|a| a.meta.path().is_ident("entity_id"))
-                            .is_some()
-                    })
+                    .find(|f| f.attrs.iter().any(|a| a.meta.path().is_ident("entity_id")))
                     .expect("there must be an Id");
 
                 // this is really scuffed but I couldn't quickly find a group_by method that works
@@ -97,8 +92,7 @@ pub fn derive_entity(item: TokenStream) -> TokenStream {
                 let mut names: Vec<_> = n.named.iter().map(|n| n.ident.as_ref().unwrap()).collect();
                 let mut types: Vec<_> = n.named.iter().map(|n| n.ty.clone()).collect();
 
-                let expr_base_name =
-                    Ident::new(&format!("{}ExprBase", ident.to_string()), Span::call_site());
+                let expr_base_name = Ident::new(&format!("{ident}ExprBase"), Span::call_site());
 
                 let expr_base = quote! {
                     struct #expr_base_name;
@@ -116,14 +110,14 @@ pub fn derive_entity(item: TokenStream) -> TokenStream {
                 };
 
                 let mut names_for_types = vec![];
-                while let Some(ty) = types.get(0) {
+                while let Some(ty) = types.first() {
                     let all_ty: Vec<_> = types
                         .clone()
                         .into_iter()
                         .enumerate()
                         .filter_map(|(i, t)| {
                             (t.to_token_stream().to_string() == ty.to_token_stream().to_string()) // this is really bad...
-                                .then(|| i)
+                                .then_some(i)
                         })
                         .collect();
 
@@ -135,13 +129,14 @@ pub fn derive_entity(item: TokenStream) -> TokenStream {
                     types = types
                         .into_iter()
                         .enumerate()
-                        .filter_map(|(i, ty)| (!all_ty.contains(&i)).then(|| ty))
+                        .filter_map(|(i, ty)| (!all_ty.contains(&i)).then_some(ty))
                         .collect();
 
                     names = names
                         .into_iter()
                         .enumerate()
-                        .filter_map(|(i, n)| (!all_ty.contains(&i)).then(|| n))
+                        .filter(|&(i, _)| (!all_ty.contains(&i)))
+                        .map(|(_, n)| n)
                         .collect();
                 }
 
