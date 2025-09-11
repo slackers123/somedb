@@ -1,8 +1,11 @@
 use std::{
     collections::HashMap,
     error::Error,
-    fs::{self},
+    fs::{self, File, OpenOptions},
+    io::{self, Read, Write},
     path::PathBuf,
+    sync::atomic::{AtomicU32, Ordering},
+    time::Duration,
 };
 
 use crate::{
@@ -15,11 +18,18 @@ use crate::{
     type_hash::TypeHash,
 };
 
+/// This timeout is used for a lot of internal stuff it is pretty arbitraty right now
+const SLEEP_TIME: Duration = Duration::from_millis(10);
+
+/// A counter for the db. this is used to allow for multiple db instances in the same process.
+static DB_CNT: AtomicU32 = AtomicU32::new(0);
+
 /// A SomeDb instance
 #[derive(Debug)]
 pub struct Database {
     db_dir: PathBuf,
     stored_types: HashMap<TypeHash, ()>,
+    db_id: u32,
 }
 
 impl Database {
@@ -53,9 +63,12 @@ impl Database {
             })
             .collect();
 
+        let db_id = DB_CNT.fetch_add(1, Ordering::Relaxed);
+
         Ok(Database {
             db_dir,
             stored_types,
+            db_id,
         })
     }
 
@@ -107,11 +120,9 @@ impl Database {
     }
 
     pub fn raw_write_all<T: Entity>(&mut self, raw: EntityMeta<T>) -> DbResult<()> {
-        let type_hash = T::type_hash();
-
         let new_data = raw.encoded();
 
-        fs::write(self.type_hash_file_path(&type_hash), new_data)?;
+        self.get_wlock::<T>().get()?.write(&new_data)?;
 
         Ok(())
     }
@@ -127,9 +138,8 @@ impl Database {
     }
 
     pub fn raw_read_all<T: Entity>(&self) -> DbResult<EntityMeta<T>> {
-        let type_hash = T::type_hash();
-
-        let vec = fs::read(self.type_hash_file_path(&type_hash))?;
+        let mut vec = Vec::new();
+        self.get_rlock::<T>().get()?.read_to_end(&mut vec)?;
 
         let mut reader = ByteReader::new(&vec);
 
@@ -224,6 +234,116 @@ impl Database {
     /// [save_to_db](crate::query::DbIterator::save_to_db) function.
     pub fn query_mut<'a, T: 'static + Entity>(&'a mut self) -> DbResult<DbQueryMut<'a, T>> {
         DbQueryMut::new(self)
+    }
+
+    ///////////// LOCKING AND SYNC CODE /////////////
+
+    fn get_rlock<T: Entity>(&self) -> RLock {
+        RLock::new(self.type_hash_file_path(&T::type_hash()), self.guid())
+    }
+
+    fn get_wlock<T: Entity>(&self) -> WLock {
+        WLock::new(self.type_hash_file_path(&T::type_hash()), self.guid())
+    }
+
+    fn guid(&self) -> String {
+        format!("{}-{}", std::process::id(), self.db_id)
+    }
+}
+
+fn someone_has_rlock(file: &PathBuf) -> bool {
+    let files = fs::read_dir(file.parent().unwrap()).unwrap();
+
+    for file in files {
+        if file
+            .unwrap()
+            .path()
+            .extension()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("rlock")
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+fn someone_has_wlock(file: &PathBuf) -> bool {
+    let files = fs::read_dir(file.parent().unwrap()).unwrap();
+
+    for entry in files {
+        if entry.unwrap().path() == file.with_extension("wlock") {
+            return true;
+        }
+    }
+    return false;
+}
+
+fn rlock_file(file: &PathBuf, guid: &str) -> PathBuf {
+    file.with_extension(format!("{guid}-rlock"))
+}
+
+pub struct RLock {
+    file: PathBuf,
+    guid: String,
+}
+
+impl RLock {
+    pub fn new(file: PathBuf, guid: String) -> Self {
+        while someone_has_wlock(&file) {
+            std::thread::sleep(SLEEP_TIME);
+        }
+
+        fs::write(rlock_file(&file, &guid), "").unwrap();
+        RLock { guid, file }
+    }
+
+    pub fn get(&self) -> io::Result<File> {
+        File::open(&self.file)
+    }
+}
+
+impl Drop for RLock {
+    fn drop(&mut self) {
+        fs::remove_file(rlock_file(&self.file, &self.guid)).unwrap();
+    }
+}
+
+pub struct WLock {
+    file: PathBuf,
+}
+
+impl WLock {
+    pub fn new(file: PathBuf, guid: String) -> Self {
+        while someone_has_wlock(&file) {
+            std::thread::sleep(SLEEP_TIME);
+        }
+
+        fs::write(file.with_extension("wlock"), &guid).unwrap();
+
+        while someone_has_rlock(&file) {
+            std::thread::sleep(SLEEP_TIME);
+        }
+
+        let lockfile = fs::read_to_string(file.with_extension("wlock")).unwrap();
+
+        if lockfile != guid {
+            panic!("there has been some sort of collision");
+        }
+
+        WLock { file }
+    }
+
+    pub fn get(&self) -> io::Result<File> {
+        OpenOptions::new().read(true).write(true).open(&self.file)
+    }
+}
+
+impl Drop for WLock {
+    fn drop(&mut self) {
+        fs::remove_file(self.file.with_extension("wlock")).unwrap();
     }
 }
 
