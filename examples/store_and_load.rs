@@ -12,7 +12,7 @@ struct MyStruct {
 
 #[cfg_attr(test, test)]
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut db = Database::default(true)?;
+    let mut db = Database::default()?;
 
     let entity = MyStruct {
         id: 0,

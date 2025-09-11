@@ -3,7 +3,7 @@ use std::{
     error::Error,
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::atomic::{AtomicU32, Ordering},
     time::Duration,
 };
@@ -33,11 +33,11 @@ pub struct Database {
 }
 
 impl Database {
-    pub fn default(clear: bool) -> DbResult<Self> {
-        Self::new(PathBuf::from("sdb/"), clear)
+    pub fn default() -> DbResult<Self> {
+        Self::new(PathBuf::from("sdb/"), false)
     }
 
-    pub fn new(db_dir: PathBuf, clear: bool) -> DbResult<Self> {
+    pub fn new(db_dir: impl AsRef<Path>, clear: bool) -> DbResult<Self> {
         if clear {
             let _ = fs::remove_dir_all(&db_dir);
         }
@@ -66,7 +66,7 @@ impl Database {
         let db_id = DB_CNT.fetch_add(1, Ordering::Relaxed);
 
         Ok(Database {
-            db_dir,
+            db_dir: db_dir.as_ref().to_path_buf(),
             stored_types,
             db_id,
         })

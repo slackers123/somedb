@@ -14,7 +14,7 @@ struct Foo {
 
 #[test]
 fn load_without_create() -> Result<(), Box<dyn Error>> {
-    let db = Database::default(true)?;
+    let db = Database::default()?;
     assert_eq!(
         db.find_by_id::<Foo>(0)
             .expect_err("find should not succed in this case"),
