@@ -2,8 +2,8 @@ use std::error::Error;
 
 use somedb::{db::Database, entity};
 
-#[derive(Debug, PartialEq)]
 #[entity]
+#[derive(Debug, PartialEq)]
 struct MyStruct {
     #[entity_id(auto_generate)]
     id: u32,

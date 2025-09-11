@@ -14,7 +14,7 @@ struct MyStruct {
 fn main() -> Result<(), Box<dyn Error>> {
     let mut db = Database::default(true)?;
 
-    let mut entity = MyStruct {
+    let entity = MyStruct {
         id: 0,
         data: "Hello, World!".into(),
     };
