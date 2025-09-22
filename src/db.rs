@@ -33,6 +33,7 @@ pub struct Database {
 }
 
 impl Database {
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> DbResult<Self> {
         Self::new(PathBuf::from("sdb/"), false)
     }
@@ -122,7 +123,7 @@ impl Database {
     pub fn raw_write_all<T: Entity>(&mut self, raw: EntityMeta<T>) -> DbResult<()> {
         let new_data = raw.encoded();
 
-        self.get_wlock::<T>().get()?.write(&new_data)?;
+        self.get_wlock::<T>().get()?.write_all(&new_data)?;
 
         Ok(())
     }
@@ -251,37 +252,27 @@ impl Database {
     }
 }
 
-fn someone_has_rlock(file: &PathBuf) -> bool {
-    let files = fs::read_dir(file.parent().unwrap()).unwrap();
+fn someone_has_rlock(file: &Path) -> bool {
+    let mut files = fs::read_dir(file.parent().unwrap()).unwrap();
 
-    for file in files {
-        if file
-            .unwrap()
+    files.any(|file| {
+        file.unwrap()
             .path()
             .extension()
             .unwrap()
             .to_str()
             .unwrap()
             .starts_with("rlock")
-        {
-            return true;
-        }
-    }
-    return false;
+    })
 }
 
-fn someone_has_wlock(file: &PathBuf) -> bool {
-    let files = fs::read_dir(file.parent().unwrap()).unwrap();
-
-    for entry in files {
-        if entry.unwrap().path() == file.with_extension("wlock") {
-            return true;
-        }
-    }
-    return false;
+fn someone_has_wlock(file: &Path) -> bool {
+    fs::read_dir(file.parent().unwrap())
+        .unwrap()
+        .any(|entry| entry.unwrap().path() == file.with_extension("wlock"))
 }
 
-fn rlock_file(file: &PathBuf, guid: &str) -> PathBuf {
+fn rlock_file(file: &Path, guid: &str) -> PathBuf {
     file.with_extension(format!("{guid}-rlock"))
 }
 

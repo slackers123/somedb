@@ -2,3 +2,4 @@
 Cargo.lock
 *sdb/
 test_proj/
+sm_test/
