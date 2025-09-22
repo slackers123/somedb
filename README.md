@@ -14,7 +14,7 @@ struct MyStruct {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut db = somedb::db::Database::default(true)?;
+    let mut db = somedb::db::Database::default()?;
 
     let entity = MyStruct {
         id: 0, // this will be ignored because auto_generate is active
